@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SARA OS · Sync</title>
+<style>
+  :root {
+    --bg1:#3a0f40; --bg2:#14051a; --card:#fff4fc; --ink:#5a1660; --soft:#f3c8ee;
+    --pink:#ff7ac8; --rose:#e0469a; --lila:#b46be0; --ok:#5cc98d; --warn:#ffb347;
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; font-family: ui-rounded, "SF Pro Rounded", system-ui, -apple-system, "Segoe UI", sans-serif;
+         background: radial-gradient(circle at 20% 0%, #6a1f72, transparent 60%), linear-gradient(var(--bg1), var(--bg2));
+         background-attachment: fixed; color:var(--soft); min-height:100vh; }
+  main { max-width: 560px; margin: 0 auto; padding: 18px 14px 60px; }
+  header { text-align:center; margin: 6px 0 18px; }
+  header h1 { margin:0; font-size: 30px; letter-spacing: 2px; color:#fff; }
+  header h1 span { color: var(--pink); }
+  header p { margin: 4px 0 0; opacity:.85; font-size: 14px; }
+  .card { background: var(--card); color: var(--ink); border-radius: 18px; padding: 16px; margin: 14px 0;
+          box-shadow: 0 6px 24px rgba(0,0,0,.25); }
+  .card h2 { margin: 0 0 10px; font-size: 17px; display:flex; align-items:center; gap:8px; }
+  .row { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+  button { border:0; border-radius: 12px; padding: 11px 16px; font: inherit; font-weight: 700; cursor:pointer;
+           background: linear-gradient(135deg, var(--pink), var(--rose)); color:#fff; }
+  button.ghost { background: #f6dff3; color: var(--ink); }
+  button.small { padding: 6px 10px; font-size: 13px; border-radius: 9px; }
+  button:disabled { opacity: .45; cursor: default; }
+  input[type=text], input[type=number] { flex:1; min-width: 0; border: 2px solid #f0cce9; border-radius: 12px; padding: 10px 12px;
+           font: inherit; color: var(--ink); background:#fff; }
+  input[type=range] { width: 100%; accent-color: var(--rose); }
+  .big { width:100%; font-size: 17px; padding: 14px; }
+  .status { display:flex; align-items:center; gap:8px; font-weight:700; }
+  .dot { width:11px; height:11px; border-radius:50%; background:#c9a; box-shadow: 0 0 0 3px #f2dbee; }
+  .dot.on { background: var(--ok); box-shadow: 0 0 0 3px #d4f5e3; }
+  .grid { display:grid; grid-template-columns: repeat(3, 1fr); gap:8px; }
+  .stat { background:#fbe7f7; border-radius: 12px; padding: 9px; text-align:center; }
+  .stat b { display:block; font-size: 20px; color: var(--rose); }
+  .stat small { font-size: 12px; opacity: .8; }
+  .bar { height: 8px; background:#f3d8ee; border-radius: 6px; overflow:hidden; margin: 3px 0 7px; }
+  .bar i { display:block; height:100%; background: linear-gradient(90deg, var(--lila), var(--pink)); }
+  .lbl { font-size: 13px; display:flex; justify-content:space-between; }
+  ul.list { list-style:none; padding:0; margin: 10px 0 0; }
+  ul.list li { display:flex; justify-content:space-between; align-items:center; gap:8px; padding: 8px 10px;
+               background:#fbe7f7; border-radius: 10px; margin-bottom: 6px; font-size: 14px; }
+  .hint { font-size: 13px; opacity: .8; margin: 6px 0 0; line-height: 1.4; }
+  .warnbox { background:#fff0d9; color:#7a4a00; border-radius:12px; padding:10px 12px; font-size:14px; line-height:1.4; }
+  canvas#preview { image-rendering: pixelated; width: 228px; border-radius: 6px; background:#000;
+                   border: 6px solid #fff; box-shadow: 0 4px 12px rgba(0,0,0,.25); display:block; margin: 10px auto; }
+  .progress { height: 12px; background:#f3d8ee; border-radius: 8px; overflow:hidden; margin-top:8px; }
+  .progress i { display:block; height:100%; width:0; background: linear-gradient(90deg, var(--lila), var(--pink)); transition: width .2s; }
+  #log { font-family: ui-monospace, Menlo, monospace; font-size: 11px; color:#cfa6cb; white-space: pre-wrap;
+         max-height: 140px; overflow:auto; margin-top: 8px; }
+  .hidden { display:none; }
+  details summary { cursor:pointer; font-weight:700; }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>SARA <span>OS</span> ♥</h1>
+    <p>Fotos, Gründe & Geschenke per Bluetooth aufs Board</p>
+  </header>
+
+  <div id="noBt" class="card hidden">
+    <div class="warnbox">
+      <b>Dieser Browser kann kein Bluetooth.</b><br>
+      Nimm <b>Chrome</b> (Android, Windows, Mac) oder <b>Edge</b>.<br>
+      Auf dem <b>iPhone</b>: kostenlose App <b>„Bluefy“</b> installieren und diese Seite darin öffnen.
+    </div>
+  </div>
+
+  <section class="card">
+    <h2>📡 Verbindung</h2>
+    <div class="row" style="justify-content:space-between">
+      <div class="status"><span id="dot" class="dot"></span><span id="connText">Nicht verbunden</span></div>
+      <button id="btnConnect">Verbinden</button>
+    </div>
+    <p class="hint">Am Board die App <b>SYNC</b> öffnen (oder Board gerade eingeschaltet) – dann „Melegim &lt;3“ auswählen.</p>
+    <div id="err" class="warnbox hidden" style="margin-top:10px"></div>
+    <button class="ghost small hidden" id="btnAll" style="margin-top:8px">Alle Bluetooth-Geräte anzeigen</button>
+  </section>
+
+  <div id="app" class="hidden">
+    <section class="card">
+      <h2>💜 Status <button class="small ghost" id="btnRefresh" style="margin-left:auto">Aktualisieren</button></h2>
+      <div class="grid">
+        <div class="stat"><b id="sTage">–</b><small>Tage zusammen</small></div>
+        <div class="stat"><b id="sHerzen">–</b><small>Herzen</small></div>
+        <div class="stat"><b id="sGut">–</b><small>Gutscheine</small></div>
+        <div class="stat"><b id="sUhr">–</b><small id="sDatum">Uhr am Board</small></div>
+        <div class="stat"><b id="sAkku">–</b><small>Akku</small></div>
+        <div class="stat"><b id="sSerie">–</b><small>Capy-Serie</small></div>
+      </div>
+      <div style="margin-top:12px">
+        <div class="lbl"><span id="sCapy">Capy</span><span></span></div>
+        <div class="lbl"><span>♥ Liebe</span><span id="vLiebe"></span></div><div class="bar"><i id="bLiebe"></i></div>
+        <div class="lbl"><span>🍉 Satt</span><span id="vSatt"></span></div><div class="bar"><i id="bSatt"></i></div>
+        <div class="lbl"><span>🌙 Energie</span><span id="vEnergie"></span></div><div class="bar"><i id="bEnergie"></i></div>
+        <div class="lbl"><span>⭐ Spaß</span><span id="vSpass"></span></div><div class="bar"><i id="bSpass"></i></div>
+      </div>
+      <p class="hint" id="sHi"></p>
+      <button class="ghost big" id="btnTime" style="margin-top:6px">🕒 Uhr vom Gerät übernehmen</button>
+    </section>
+
+    <section class="card">
+      <h2>🎁 Herzen verschenken</h2>
+      <div class="row">
+        <input type="number" id="giftN" value="50" min="1" max="1000" style="max-width:90px">
+        <input type="text" id="giftText" maxlength="50" placeholder="Weil du heute so süß warst">
+      </div>
+      <button class="big" id="btnGift" style="margin-top:10px">Geschenk schicken ♥</button>
+      <p class="hint">Bei Sara poppt ein Geschenk mit deinem Text auf, die Herzen landen auf ihrem Konto. Max. ~50 Zeichen.</p>
+    </section>
+
+    <section class="card">
+      <h2>💌 Gründe, warum ich dich liebe</h2>
+      <div class="row">
+        <input type="text" id="reasonText" maxlength="55" placeholder="Dein Lachen am Morgen">
+        <button id="btnReason">Hinzufügen</button>
+      </div>
+      <p class="hint">Läuft in der Tagesrotation mit. Großbuchstaben & Umbruch macht das Board selbst (max. 5 Zeilen à 11 Zeichen).</p>
+      <ul class="list" id="reasonList"></ul>
+    </section>
+
+    <section class="card">
+      <h2>📸 Fotos</h2>
+      <input type="file" id="photoFile" accept="image/*">
+      <div id="photoEdit" class="hidden">
+        <canvas id="preview" width="76" height="95"></canvas>
+        <div class="lbl"><span>Höhe</span><span id="vH"></span></div>
+        <input type="range" id="rH" min="50" max="120" value="95">
+        <div class="lbl"><span>Ausschnitt</span><span></span></div>
+        <input type="range" id="rPos" min="0" max="100" value="50">
+        <div class="lbl"><span>Zoom</span><span id="vZoom"></span></div>
+        <input type="range" id="rZoom" min="100" max="250" value="100">
+        <div class="lbl"><span>Helligkeit</span><span></span></div>
+        <input type="range" id="rBright" min="80" max="160" value="118">
+        <button class="big" id="btnUpload" style="margin-top:10px">Aufs Board laden</button>
+        <div class="progress hidden" id="upProg"><i id="upBar"></i></div>
+      </div>
+      <p class="hint">Das Board zeigt Fotos 76 Pixel breit. Die Vorschau zeigt genau, wie es dort aussieht. Platz für 24 eigene Fotos.</p>
+      <ul class="list" id="photoList"></ul>
+    </section>
+
+    <details class="card">
+      <summary>⚠️ Zurücksetzen</summary>
+      <p class="hint">Nur für dich – Sara kann das am Board nicht.</p>
+      <div class="row" style="margin-top:8px">
+        <input type="number" id="setN" value="0" min="0" max="100000" style="max-width:110px">
+        <button class="ghost" id="btnSetHearts">Herzen auf diesen Wert setzen</button>
+      </div>
+      <button class="big" id="btnResetHearts" style="margin-top:10px">Herzen & Gutscheine auf 0</button>
+      <p class="hint">„Auf 0“ setzt die Herzen auf 0 und sperrt alle Gutscheine wieder (auch eingelöste). Beim Setzen eines Werts bleiben nur die Gutscheine frei, die zu diesem Wert passen.</p>
+    </details>
+
+    <details class="card">
+      <summary>🛠️ Protokoll</summary>
+      <div id="log"></div>
+    </details>
+  </div>
+</main>
+
+<script>
+const NUS = '6e400001-b5a3-f393-e0a9-e50e24dcca9e';
+const NUS_RX = '6e400002-b5a3-f393-e0a9-e50e24dcca9e';   // wir schreiben
+const NUS_TX = '6e400003-b5a3-f393-e0a9-e50e24dcca9e';   // Board antwortet
+const $ = id => document.getElementById(id);
+let device = null, rx = null, tx = null, lineBuf = '', waiters = [], busy = false;
+
+// Zeichen vom Board (CP437-Sonderzeichen) lesbar machen
+const CP = { 0x8E:'Ä', 0x99:'Ö', 0x9A:'Ü', 0x80:'Ç', 0x03:'♥' };
+function decode(bytes) { let s = ''; for (const b of bytes) s += CP[b] ?? String.fromCharCode(b); return s; }
+function log(t) { const l = $('log'); l.textContent += t + '\n'; l.scrollTop = l.scrollHeight; }
+
+function showErr(html) { const e = $('err'); e.innerHTML = html; e.classList.remove('hidden'); }
+function browserInfo() {
+  const ua = navigator.userAgent;
+  if (/iPhone|iPad/.test(ua)) return 'iPhone/iPad: Safari und Chrome können dort kein Bluetooth. Bitte die kostenlose App <b>„Bluefy“</b> laden und diese Seite darin öffnen.';
+  if (location.protocol === 'file:') return 'Die Seite ist als Datei geöffnet. Manche Browser erlauben Bluetooth nur über einen <b>https-Link</b>. Öffne sie in <b>Chrome am PC</b> oder lade sie z. B. bei GitHub Pages / Netlify hoch.';
+  if (/Firefox/.test(ua)) return 'Firefox kann kein Bluetooth. Bitte <b>Chrome</b> oder <b>Edge</b> nehmen.';
+  return 'Dieser Browser bzw. diese Ansicht kann kein Bluetooth (z. B. Vorschau in einer App). Bitte die Datei in <b>Chrome</b> öffnen.';
+}
+if (!navigator.bluetooth) { $('noBt').classList.remove('hidden'); showErr('<b>Kein Bluetooth hier.</b><br>' + browserInfo()); }
+
+// ---------- Verbindung -----------------------------------------------------
+$('btnConnect').onclick = () => connect(false);
+$('btnAll').onclick = () => connect(true);
+async function connect(all) {
+  if (device && device.gatt.connected) { device.gatt.disconnect(); return; }
+  if (!navigator.bluetooth) { showErr('<b>Kein Bluetooth hier.</b><br>' + browserInfo()); return; }
+  $('err').classList.add('hidden');
+  try {
+    const opts = all ? { acceptAllDevices: true, optionalServices: [NUS] }
+                     : { filters: [{ namePrefix: 'Melegim' }, { services: [NUS] }], optionalServices: [NUS] };
+    device = await navigator.bluetooth.requestDevice(opts);
+    device.addEventListener('gattserverdisconnected', onDisconnect);
+    $('connText').textContent = 'Verbinde …';
+    const server = await device.gatt.connect();
+    const svc = await server.getPrimaryService(NUS);
+    rx = await svc.getCharacteristic(NUS_RX);
+    tx = await svc.getCharacteristic(NUS_TX);
+    lineBuf = ''; waiters = [];
+    await tx.startNotifications();
+    tx.addEventListener('characteristicvaluechanged', e => onData(new Uint8Array(e.target.value.buffer)));
+    $('dot').classList.add('on'); $('connText').textContent = 'Verbunden mit ' + (device.name || 'Board');
+    $('btnConnect').textContent = 'Trennen';
+    $('app').classList.remove('hidden');
+    await refreshAll();
+  } catch (e) {
+    log('Fehler: ' + e.name + ' ' + e.message);
+    $('connText').textContent = 'Nicht verbunden';
+    $('btnAll').classList.remove('hidden');
+    if (e.name === 'NotFoundError') showErr('Kein Board ausgewählt oder keins gefunden.<br>• Ist am Board die App <b>SYNC</b> offen?<br>• Ist Bluetooth am Handy/PC an?<br>• Am Android: Standort (GPS) muss an sein.<br>• Sonst „Alle Bluetooth-Geräte anzeigen“ probieren.');
+    else if (e.name === 'SecurityError' || e.name === 'NotAllowedError') showErr('Bluetooth wurde blockiert. ' + browserInfo());
+    else showErr('Fehler: ' + e.message);
+  }
+}
+function onDisconnect() {
+  $('dot').classList.remove('on'); $('connText').textContent = 'Getrennt';
+  $('btnConnect').textContent = 'Verbinden'; rx = tx = null;
+}
+function onData(bytes) {
+  lineBuf += decode(bytes);
+  let i;
+  while ((i = lineBuf.indexOf('\n')) >= 0) {
+    const line = lineBuf.slice(0, i).replace('\r', ''); lineBuf = lineBuf.slice(i + 1);
+    log('← ' + line);
+    const w = waiters.find(w => w.test(line));
+    if (w) { waiters = waiters.filter(x => x !== w); w.resolve(line); }
+  }
+}
+// wartet auf eine Antwortzeile, die test() erfuellt
+function expect(test, ms = 8000) {
+  return new Promise((resolve, reject) => {
+    const w = { test, resolve };
+    waiters.push(w);
+    setTimeout(() => { if (waiters.includes(w)) { waiters = waiters.filter(x => x !== w); reject(new Error('Keine Antwort vom Board')); } }, ms);
+  });
+}
+async function writeBytes(u8) {
+  for (let o = 0; o < u8.length; o += 120) {
+    const part = u8.slice(o, o + 120);
+    if (rx.writeValueWithResponse) await rx.writeValueWithResponse(part); else await rx.writeValue(part);
+  }
+}
+async function send(cmd) { log('→ ' + cmd); await writeBytes(new TextEncoder().encode(cmd + '\n')); }
+async function ask(cmd, test, ms) { const p = expect(test, ms); await send(cmd); return p; }
+async function guard(fn) {
+  if (busy) return; busy = true;
+  document.querySelectorAll('button').forEach(b => b.disabled = b.id !== 'btnConnect');
+  try { await fn(); $('err').classList.add('hidden'); } catch (e) { log('Fehler: ' + e.message); showErr('⚠️ ' + e.message + '<br><small>Board antwortet nicht? Board neu starten, SYNC öffnen, neu verbinden. Details unten im Protokoll.</small>'); }
+  busy = false; document.querySelectorAll('button').forEach(b => b.disabled = false);
+}
+
+// ---------- Status -----------------------------------------------------------
+async function refreshInfo() {
+  const line = await ask('#info', l => l.includes('{"v"') && l.trim().endsWith('}'));
+  const d = JSON.parse(line.slice(line.lastIndexOf('{"v"')));   // evtl. Reste alter Antworten ignorieren
+  $('sTage').textContent = d.tage; $('sHerzen').textContent = d.herzen;
+  $('sGut').textContent = d.gutscheine[0] + '/' + d.gutscheine[1];
+  $('sUhr').textContent = d.uhr; $('sDatum').textContent = d.datum;
+  $('sAkku').textContent = d.akku < 0 ? 'USB' : d.akku + '%' + (d.laedt ? '⚡' : '');
+  $('sSerie').textContent = '🔥' + d.capy.serie;
+  $('sCapy').textContent = ['Baby', 'Teenie', 'Großes'][d.capy.stufe] + ' Capy' + (d.capy.schlaeft ? ' · schläft 💤' : '');
+  for (const k of ['liebe', 'satt', 'energie', 'spass']) {
+    const id = k[0].toUpperCase() + k.slice(1);
+    $('b' + id).style.width = d.capy[k] + '%'; $('v' + id).textContent = d.capy[k] + '%';
+  }
+  $('sHi').textContent = `Highscores: Bricks ${d.hi[0]} · Blast ${d.hi[1]} · Flying Capy ${d.hi[2]} · Racer ${d.hi[3]}  —  ${d.v}`;
+  if (!d.speicher) showErr('Zusatz-Speicher nicht gefunden (Chip ' + (d.chip || '?') + ') – Fotos & Gründe gehen gerade nicht. Bitte diese Meldung an Claude schicken.');
+}
+async function refreshReasons() {
+  const list = [];
+  const done = new Promise((resolve, reject) => {
+    const collect = { test: l => { if (l.startsWith('G ')) { if (l === 'G ENDE') return true; list.push(l); } return false; }, resolve };
+    waiters.push(collect);
+    setTimeout(() => { if (waiters.includes(collect)) { waiters = waiters.filter(x => x !== collect); reject(new Error('Keine Antwort')); } }, 8000);
+  });
+  await send('#gruende'); await done;
+  const ul = $('reasonList'); ul.innerHTML = '';
+  if (!list.length) ul.innerHTML = '<li style="opacity:.7">Noch keine eigenen Gründe</li>';
+  list.forEach(l => {
+    const m = l.match(/^G (\d+) (.*)$/); if (!m) return;
+    const li = document.createElement('li');
+    li.innerHTML = `<span>${m[2].replace(/\|/g, ' ')}</span>`;
+    const b = document.createElement('button'); b.className = 'small ghost'; b.textContent = 'Löschen';
+    b.onclick = () => guard(async () => { await ask('#grunddel ' + m[1], l => l.startsWith('OK') || l.startsWith('FEHLER')); await refreshReasons(); await refreshInfo(); });
+    li.appendChild(b); ul.appendChild(li);
+  });
+}
+async function refreshPhotos() {
+  const line = await ask('#fotos', l => l.startsWith('F'));
+  const ul = $('photoList'); ul.innerHTML = '';
+  const items = line.slice(1).trim().split(' ').filter(Boolean);
+  if (!items.length) ul.innerHTML = '<li style="opacity:.7">Noch keine eigenen Fotos</li>';
+  items.forEach((it, n) => {
+    const [slot, h] = it.split(':');
+    const li = document.createElement('li');
+    li.innerHTML = `<span>📷 Eigenes Foto ${n + 1} <small style="opacity:.6">(76×${h})</small></span>`;
+    const b = document.createElement('button'); b.className = 'small ghost'; b.textContent = 'Löschen';
+    b.onclick = () => guard(async () => { if (!confirm('Foto wirklich löschen?')) return; await ask('#fotodel ' + slot, l => l.startsWith('OK') || l.startsWith('FEHLER')); await refreshPhotos(); });
+    li.appendChild(b); ul.appendChild(li);
+  });
+}
+async function refreshAll() { await guard(async () => { await refreshInfo(); await refreshReasons(); await refreshPhotos(); }); }
+$('btnRefresh').onclick = () => refreshAll();
+
+$('btnTime').onclick = () => guard(async () => {
+  const n = new Date(), p = v => String(v).padStart(2, '0');
+  await ask(`#datum ${p(n.getDate())}.${p(n.getMonth() + 1)}.${n.getFullYear()} ${p(n.getHours())}:${p(n.getMinutes())}`, l => l.startsWith('OK') || l.startsWith('FEHLER'));
+  await refreshInfo();
+});
+
+$('btnGift').onclick = () => guard(async () => {
+  const n = parseInt($('giftN').value, 10) || 0, t = $('giftText').value.trim();
+  if (n < 1 || n > 1000) throw new Error('1 bis 1000 Herzen');
+  const r = await ask(`#herzen ${n} ${t}`, l => l.startsWith('OK') || l.startsWith('FEHLER'));
+  if (r.startsWith('FEHLER')) throw new Error(r);
+  $('giftText').value = ''; await refreshInfo();
+});
+
+$('btnReason').onclick = () => guard(async () => {
+  const t = $('reasonText').value.trim(); if (!t) return;
+  const r = await ask('#grund ' + t, l => l.startsWith('OK') || l.startsWith('FEHLER'));
+  if (r.startsWith('FEHLER')) throw new Error(r);
+  $('reasonText').value = ''; await refreshReasons(); await refreshInfo();
+});
+
+async function setHearts(n) {
+  const r = await ask('#herzenset ' + n, l => l.startsWith('OK') || l.startsWith('FEHLER'));
+  if (r.startsWith('FEHLER')) throw new Error(r);
+  await refreshInfo();
+}
+$('btnResetHearts').onclick = () => guard(async () => {
+  if (!confirm('Wirklich alle Herzen auf 0 setzen und alle Gutscheine sperren?')) return;
+  await setHearts(0);
+});
+$('btnSetHearts').onclick = () => guard(async () => {
+  const n = parseInt($('setN').value, 10);
+  if (isNaN(n) || n < 0) throw new Error('Bitte eine Zahl ab 0 eingeben');
+  if (!confirm(`Herzen auf ${n} setzen?`)) return;
+  await setHearts(n);
+});
+
+// ---------- Fotos -------------------------------------------------------------
+let img = null;
+$('photoFile').onchange = e => {
+  const f = e.target.files[0]; if (!f) return;
+  const i = new Image();
+  i.onload = () => {
+    img = i;
+    const natH = Math.round(76 * i.height / i.width);
+    $('rH').value = Math.max(50, Math.min(120, natH));
+    $('photoEdit').classList.remove('hidden'); render();
+  };
+  i.src = URL.createObjectURL(f);
+};
+['rH', 'rPos', 'rZoom', 'rBright'].forEach(id => $(id).oninput = render);
+
+function render() {
+  if (!img) return;
+  const W = 76, H = +$('rH').value, zoom = +$('rZoom').value / 100, pos = +$('rPos').value / 100;
+  $('vH').textContent = H + ' px'; $('vZoom').textContent = Math.round(zoom * 100) + '%';
+  const c = $('preview'); c.width = W; c.height = H; c.style.height = (H * 3) + 'px';
+  const ctx = c.getContext('2d');
+  // Bild so skalieren, dass es den Rahmen fuellt, dann Zoom + Ausschnitt
+  const s = Math.max(W / img.width, H / img.height) * zoom;
+  const dw = img.width * s, dh = img.height * s;
+  const ox = (W - dw) / 2, oy = (H - dh) * pos;
+  ctx.imageSmoothingQuality = 'high';
+  ctx.clearRect(0, 0, W, H);
+  ctx.drawImage(img, ox, oy, dw, dh);
+  // Helligkeit wie bei den eingebauten Fotos (Gamma-Aufhellung) + RGB565-Rundung fuer echte Vorschau
+  const g = 1 / (+$('rBright').value / 100);
+  const d = ctx.getImageData(0, 0, W, H);
+  for (let k = 0; k < d.data.length; k += 4) {
+    for (let ch = 0; ch < 3; ch++) {
+      let v = Math.pow(d.data[k + ch] / 255, g) * 255;
+      d.data[k + ch] = ch === 1 ? (Math.round(v) & 0xFC) : (Math.round(v) & 0xF8);
+    }
+    d.data[k + 3] = 255;
+  }
+  ctx.putImageData(d, 0, 0);
+}
+function toRGB565() {
+  const c = $('preview'), d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data;
+  const out = new Uint8Array(c.width * c.height * 2);
+  for (let i = 0, o = 0; i < d.length; i += 4, o += 2) {
+    const v = ((d[i] & 0xF8) << 8) | ((d[i + 1] & 0xFC) << 3) | (d[i + 2] >> 3);
+    out[o] = v & 0xFF; out[o + 1] = v >> 8;               // little-endian wie auf dem Board
+  }
+  return out;
+}
+$('btnUpload').onclick = () => guard(async () => {
+  const H = $('preview').height, data = toRGB565();
+  const head = await ask(`#foto 76 ${H}`, l => l.startsWith('FOTO') || l.startsWith('FEHLER'), 10000);
+  if (head.startsWith('FEHLER')) throw new Error(head);
+  $('upProg').classList.remove('hidden'); $('upBar').style.width = '0%';
+  // in 2-KB-Paketen senden, nach jedem auf die Quittung warten
+  for (let o = 0; o < data.length; o += 2048) {
+    const end = Math.min(o + 2048, data.length);
+    const last = end >= data.length;
+    const ack = expect(l => last ? (l.startsWith('FERTIG') || l.startsWith('FEHLER')) : (l.startsWith('A ') || l.startsWith('FEHLER')), 15000);
+    await writeBytes(data.slice(o, end));
+    const r = await ack;
+    if (r.startsWith('FEHLER')) throw new Error(r);
+    $('upBar').style.width = Math.round(end * 100 / data.length) + '%';
+  }
+  log('Foto ist auf dem Board ♥');
+  await refreshPhotos();
+});
+</script>
+</body>
+</html>
